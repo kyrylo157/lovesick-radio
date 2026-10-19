@@ -33,5 +33,14 @@ export async function GET() {
     check("youtube-music", ytmPing),
   ]);
   const ok = results.every((r) => r.ok);
-  return Response.json({ ok, checkedAt: new Date().toISOString(), results }, { status: ok ? 200 : 503 });
+  return Response.json(
+    {
+      ok,
+      // Какой коммит сейчас выложен — по нему смоук-тест на GitHub ждёт свою версию
+      version: process.env.VERCEL_GIT_COMMIT_SHA ?? "local",
+      checkedAt: new Date().toISOString(),
+      results,
+    },
+    { status: ok ? 200 : 503 },
+  );
 }
