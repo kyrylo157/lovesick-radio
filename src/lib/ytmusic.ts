@@ -78,6 +78,24 @@ export async function ytmFindSong(artist: string, title: string) {
   return songs[0]?.sourceId ?? null;
 }
 
+/**
+ * Запасной путь — публичный oEmbed YouTube: его не режут, даже когда с серверов хостинга
+ * (Vercel) getInfo блокируется. Нет длительности — плеер узнает её при воспроизведении.
+ */
+async function oembedTrack(videoId: string): Promise<Track | null> {
+  const url = `https://www.youtube.com/oembed?format=json&url=${encodeURIComponent(`https://www.youtube.com/watch?v=${videoId}`)}`;
+  const res = await fetch(url);
+  if (!res.ok) return null;
+  const o = (await res.json()) as { title?: string; author_name?: string; thumbnail_url?: string };
+  return toTrack({
+    id: videoId,
+    title: o.title,
+    // У автоканалов YouTube Music имя вида «2hollis - Topic»
+    author: { name: (o.author_name ?? "").replace(/\s+-\s+Topic$/i, "") },
+    thumbnail: { contents: o.thumbnail_url ? [{ url: o.thumbnail_url }] : [] },
+  });
+}
+
 /** Трек по id видео — для страницы трека. */
 export async function ytmTrack(videoId: string): Promise<Track | null> {
   "use cache";
@@ -85,14 +103,20 @@ export async function ytmTrack(videoId: string): Promise<Track | null> {
   try {
     const info = await (await yt()).music.getInfo(videoId);
     const b = info.basic_info;
-    if (!b.id || !b.title) return null;
-    return toTrack({
-      id: b.id,
-      title: b.title,
-      author: { name: b.author ?? "" },
-      duration: { seconds: b.duration ?? 0 },
-      thumbnail: { contents: b.thumbnail },
-    });
+    if (b.id && b.title) {
+      return toTrack({
+        id: b.id,
+        title: b.title,
+        author: { name: b.author ?? "" },
+        duration: { seconds: b.duration ?? 0 },
+        thumbnail: { contents: b.thumbnail },
+      });
+    }
+  } catch {
+    // getInfo заблокирован или упал — пробуем oEmbed ниже
+  }
+  try {
+    return await oembedTrack(videoId);
   } catch {
     return null;
   }
