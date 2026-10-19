@@ -23,8 +23,11 @@ const nunito = Nunito({
 });
 
 export const metadata: Metadata = {
+  // Нужен, чтобы картинка-превью (opengraph-image.tsx) получила полный адрес для Telegram/соцсетей
+  metadataBase: new URL("https://lovesick-radio.vercel.app"),
   title: { default: "Lovesick Radio", template: "%s · Lovesick Radio" },
-  description: "Музыка для влюблённых и немёртвых: инди-треки целиком и чарты — в розово-чёрном склепе.",
+  description: "Музыка для влюблённых и немёртвых: инди и мировые хиты целиком — в розово-чёрном склепе.",
+  openGraph: { siteName: "Lovesick Radio", locale: "ru_RU", type: "website" },
 };
 
 export const viewport: Viewport = {
@@ -33,7 +36,8 @@ export const viewport: Viewport = {
 
 // Тема ставится до первой отрисовки, чтобы не мигало.
 // Фон из прошлого визита берём, только если такой вариант ещё существует.
-const themeScript = `try{var d=document.documentElement,t=localStorage.getItem("lovesick-theme"),b=localStorage.getItem("lovesick-bg");if(t)d.dataset.theme=t;if(${JSON.stringify(BACKDROP_IDS)}.indexOf(b)>=0)d.dataset.bg=b}catch(e){}`;
+// На слабых устройствах (≤4 ядер или ≤4 ГБ памяти) включаем облегчённый режим .lite (см. globals.css).
+const themeScript = `try{var d=document.documentElement,n=navigator,t=localStorage.getItem("lovesick-theme"),b=localStorage.getItem("lovesick-bg");if(t)d.dataset.theme=t;if(${JSON.stringify(BACKDROP_IDS)}.indexOf(b)>=0)d.dataset.bg=b;if((n.hardwareConcurrency||8)<=4||(n.deviceMemory||8)<=4)d.classList.add("lite")}catch(e){}`;
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
@@ -58,6 +62,13 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
               <MobileHeader />
               <main className="mx-auto max-w-[1300px] px-4 pb-[calc(var(--player-h)+96px)] pt-4 sm:px-8 md:pb-[calc(var(--player-h)+40px)] md:pt-8">
                 {children}
+                {/* Указание источников: требование условий Deezer и просто честно перед авторами */}
+                <footer className="mt-16 border-t-2 border-dashed border-surface-2 pt-4 text-xs text-muted">
+                  Музыка: <a href="https://audius.co" target="_blank" rel="noreferrer" className="underline hover:text-fg">Audius</a>,{" "}
+                  <a href="https://www.deezer.com" target="_blank" rel="noreferrer" className="underline hover:text-fg">Deezer</a>,{" "}
+                  <a href="https://music.youtube.com" target="_blank" rel="noreferrer" className="underline hover:text-fg">YouTube Music</a>.
+                  Все треки принадлежат их авторам. Некоммерческий проект для своих.
+                </footer>
               </main>
             </div>
           </div>

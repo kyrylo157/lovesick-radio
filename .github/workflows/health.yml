@@ -1,0 +1,25 @@
+# Раз в 6 часов проверяет, живы ли источники музыки на сайте.
+# Если /api/health ответит не 200 — workflow упадёт, и GitHub пришлёт письмо владельцу репозитория.
+name: Проверка источников музыки
+
+on:
+  schedule:
+    - cron: "17 */6 * * *"
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+jobs:
+  health:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Запрос /api/health
+        run: |
+          code=$(curl -s -o body.json -w "%{http_code}" --max-time 60 https://lovesick-radio.vercel.app/api/health)
+          cat body.json; echo
+          if [ "$code" != "200" ]; then
+            echo "::error::Источник музыки не отвечает (HTTP $code). Подробности в ответе выше."
+            exit 1
+          fi

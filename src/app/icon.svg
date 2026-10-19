@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <!-- Иконка вкладки: голова зомбика с мозгом на малиновом кружке -->
+  <circle cx="32" cy="32" r="31" fill="#c2185b"/>
+  <g stroke="#050204" stroke-width="2.6" stroke-linejoin="round">
+    <path d="M32 12c15 0 24 9 24 21 0 12-10 19-24 19S8 45 8 33c0-12 9-21 24-21z" fill="#7fa046"/>
+    <path d="M36 14c2-4 8-5 11-2 4-1 7 2 6 6 2 2 1 6-2 7-6 1-13 1-16-2-2-3-1-7 1-9z" fill="#f6c9d9"/>
+  </g>
+  <ellipse cx="23" cy="34" rx="5.5" ry="6.5" fill="#050204"/>
+  <ellipse cx="41" cy="34" rx="5.5" ry="6.5" fill="#050204"/>
+  <circle cx="25" cy="31.5" r="1.6" fill="#f5eef0"/>
+  <circle cx="43" cy="31.5" r="1.6" fill="#f5eef0"/>
+  <path d="M27 45q5 3 10 0" fill="none" stroke="#050204" stroke-width="2.2" stroke-linecap="round"/>
+</svg>

@@ -59,9 +59,9 @@ export function ThemeToggle() {
   );
 }
 
-export function SearchBox({ className = "" }: { className?: string }) {
+export function SearchBox({ className = "", initial = "" }: { className?: string; initial?: string }) {
   const router = useRouter();
-  const [q, setQ] = useState("");
+  const [q, setQ] = useState(initial);
   return (
     <form
       role="search"
@@ -76,6 +76,7 @@ export function SearchBox({ className = "" }: { className?: string }) {
         type="search"
         value={q}
         onChange={(e) => setQ(e.target.value)}
+        maxLength={100}
         placeholder="Трек или артист — можно по-русски"
         aria-label="Поиск музыки"
         className="w-full rounded-full border-3 border-outline bg-surface py-2 pl-10 pr-4 font-bold placeholder:text-muted focus:border-accent focus:outline-none"

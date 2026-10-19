@@ -5,7 +5,7 @@ import { SearchBox } from "@/components/Nav";
 import { Empty, ListSkeleton, Section } from "@/components/Section";
 import { TrackList } from "@/components/TrackList";
 import { MOODS } from "@/lib/moods";
-import { searchEverywhere } from "@/lib/music";
+import { MAX_QUERY, searchEverywhere } from "@/lib/music";
 import { hasYouTube } from "@/lib/youtube";
 
 export const metadata: Metadata = { title: "Поиск" };
@@ -14,7 +14,9 @@ export default function SearchPage({ searchParams }: PageProps<"/search">) {
   return (
     <>
       <h1 className="font-display text-5xl text-accent [text-shadow:3px_3px_0_var(--outline)]">Поиск</h1>
-      <SearchBox className="mt-4 max-w-xl" />
+      <Suspense fallback={<SearchBox className="mt-4 max-w-xl" />}>
+        <SearchField searchParams={searchParams} />
+      </Suspense>
       <Suspense fallback={<ListSkeleton />}>
         <Results searchParams={searchParams} />
       </Suspense>
@@ -22,9 +24,20 @@ export default function SearchPage({ searchParams }: PageProps<"/search">) {
   );
 }
 
-async function Results({ searchParams }: Pick<PageProps<"/search">, "searchParams">) {
+async function readQuery(searchParams: PageProps<"/search">["searchParams"]) {
   const raw = (await searchParams).q;
-  const q = (Array.isArray(raw) ? raw[0] : raw)?.trim() ?? "";
+  // Длинные «запросы» никому не нужны и только гоняют сторонние API
+  return ((Array.isArray(raw) ? raw[0] : raw)?.trim() ?? "").slice(0, MAX_QUERY);
+}
+
+/** Строка поиска с текущим запросом внутри — чтобы после поиска было видно, что искали. */
+async function SearchField({ searchParams }: Pick<PageProps<"/search">, "searchParams">) {
+  const q = await readQuery(searchParams);
+  return <SearchBox key={q} initial={q} className="mt-4 max-w-xl" />;
+}
+
+async function Results({ searchParams }: Pick<PageProps<"/search">, "searchParams">) {
+  const q = await readQuery(searchParams);
 
   if (!q) {
     return (

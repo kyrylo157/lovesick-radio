@@ -14,6 +14,7 @@ export async function generateMetadata({ params }: PageProps<"/track/[id]">): Pr
   return { title: track ? `${track.title} — ${track.artist}` : "Трек" };
 }
 
+// Явно кривые id отсекает proxy.ts настоящим 404; сюда доходят только правдоподобные.
 export default function TrackPage({ params }: PageProps<"/track/[id]">) {
   return (
     <Suspense fallback={<ListSkeleton rows={4} />}>

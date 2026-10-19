@@ -1,7 +1,7 @@
 "use client";
 
 import { create } from "zustand";
-import { persist } from "zustand/middleware";
+import { createJSONStorage, persist } from "zustand/middleware";
 import type { Playlist, Track } from "@/lib/types";
 
 interface LibraryState {
@@ -17,6 +17,25 @@ interface LibraryState {
 }
 
 const newId = () => Math.random().toString(36).slice(2, 10);
+
+/** Событие «память браузера переполнена» — его ловит StorageWarning и показывает предупреждение. */
+export const STORAGE_FULL_EVENT = "lovesick:storage-full";
+
+/*
+  localStorage вмещает ~5 МБ. Когда он переполнен (обычно из-за обложек), setItem бросает
+  QuotaExceededError — раньше это молча терялось, и новые лайки пропадали после перезагрузки.
+*/
+const safeStorage = createJSONStorage(() => ({
+  getItem: (k: string) => localStorage.getItem(k),
+  removeItem: (k: string) => localStorage.removeItem(k),
+  setItem: (k: string, v: string) => {
+    try {
+      localStorage.setItem(k, v);
+    } catch {
+      window.dispatchEvent(new Event(STORAGE_FULL_EVENT));
+    }
+  },
+}));
 
 // Пока без аккаунтов: всё хранится в браузере. Схема та же, что потом уедет в базу.
 export const useLibrary = create<LibraryState>()(
@@ -73,6 +92,6 @@ export const useLibrary = create<LibraryState>()(
         }),
     }),
     // skipHydration: сервер и первый рендер клиента видят пустую библиотеку, иначе будет hydration mismatch.
-    { name: "lovesick-library", skipHydration: true },
+    { name: "lovesick-library", skipHydration: true, storage: safeStorage },
   ),
 );

@@ -32,7 +32,10 @@ function merge(lists: Track[][], variants: string[], likelyArtist?: string) {
     .map((x) => x.t);
 }
 
-export async function searchEverywhere(query: string) {
+export const MAX_QUERY = 100;
+
+export async function searchEverywhere(rawQuery: string) {
+  const query = rawQuery.trim().slice(0, MAX_QUERY);
   const variants = queryVariants(query);
   // YouTube Music сам понимает кириллицу, ему варианты не нужны. Если он не ответил —
   // падаем обратно на Deezer (превью / полная версия через тот же YouTube позже).

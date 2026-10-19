@@ -35,6 +35,15 @@ npm run build && npx next start -p 3123   # как на проде
 - `src/lib/audius.ts`, `src/lib/deezer.ts` — источники; кэш через `"use cache"` (Next 16).
 - `src/lib/moods.ts` — «настроения» (жанры с хэллоуинскими названиями).
 
+## Проверки и защита
+
+- `npm run test:smoke` — смоук-тест в настоящем браузере (`BASE=https://lovesick-radio.vercel.app npm run test:smoke`
+  — на живом сайте). Сам запускается на GitHub после каждой выкладки на Vercel (`.github/workflows/smoke.yml`).
+- `/api/health` — живы ли Audius, Deezer и YouTube Music. GitHub проверяет его раз в 6 часов
+  (`.github/workflows/health.yml`); упало — придёт письмо.
+- `src/proxy.ts` — ограничение частоты запросов с одного IP (поиск, подбор полных версий) и 404 для кривых id треков.
+- `next.config.ts` — заголовки безопасности (CSP, запрет встраивания в чужие сайты и т.п.).
+
 ## Что дальше
 
 - Деплой на Vercel (+ ключ YouTube в настройках проекта, `use cache: remote` для кэша видео).

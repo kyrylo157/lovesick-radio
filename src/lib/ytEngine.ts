@@ -15,7 +15,8 @@ declare global {
 }
 
 export interface YTHandlers {
-  onState: (state: "playing" | "paused" | "buffering" | "ended") => void;
+  /** blocked — видео загружено, но браузер не дал ему стартовать без нажатия (Safari на iPhone). */
+  onState: (state: "playing" | "paused" | "buffering" | "ended" | "blocked") => void;
   onTime: (position: number, duration: number) => void;
   onError: (code: number) => void;
 }
@@ -56,6 +57,8 @@ function getPlayer() {
         const mount = document.createElement("div");
         host?.appendChild(mount);
         player = new YT.Player(mount, {
+          // Режим без cookies: YouTube не ставит трекинговые cookies, пока видео не запущено вручную
+          host: "https://www.youtube-nocookie.com",
           width: "100%",
           height: "100%",
           playerVars: { playsinline: 1, rel: 0, modestbranding: 1 },
@@ -89,23 +92,30 @@ function stopPoll() {
   poll = 0;
 }
 
-export async function ytLoad(videoId: string, volume: number, muted: boolean) {
+let startCheck = 0;
+
+export async function ytLoad(videoId: string, volume: number, muted: boolean, startAt = 0) {
   const p = await getPlayer();
   p.setVolume(Math.round(volume * 100));
   if (muted) p.mute();
   else p.unMute();
-  p.loadVideoById(videoId);
+  p.loadVideoById({ videoId, startSeconds: Math.floor(startAt) });
   startPoll();
-}
-
-export function ytToggle() {
-  if (!player) return;
-  if (player.getPlayerState() === window.YT?.PlayerState.PLAYING) player.pauseVideo();
-  else player.playVideo();
+  // Если за 4 сек видео так и не пошло (ни игры, ни буферизации) — автозапуск заблокирован.
+  window.clearTimeout(startCheck);
+  startCheck = window.setTimeout(() => {
+    const S = window.YT?.PlayerState;
+    const state = player?.getPlayerState?.();
+    if (S && state !== S.PLAYING && state !== S.BUFFERING) handlers?.onState("blocked");
+  }, 4000);
 }
 
 export function ytPlay() {
   player?.playVideo();
+}
+
+export function ytPause() {
+  player?.pauseVideo();
 }
 
 export function ytSeek(seconds: number) {
@@ -121,5 +131,6 @@ export function ytVolume(volume: number, muted: boolean) {
 
 export function ytStop() {
   stopPoll();
+  window.clearTimeout(startCheck);
   player?.stopVideo?.();
 }

@@ -43,7 +43,9 @@ function SeekBar({ className = "" }: { className?: string }) {
 function QueuePanel({ onClose }: { onClose: () => void }) {
   const queue = usePlayer((s) => s.queue);
   const index = usePlayer((s) => s.index);
-  const { jumpTo, removeFromQueue } = usePlayer.getState();
+  const shuffle = usePlayer((s) => s.shuffle);
+  const repeat = usePlayer((s) => s.repeat);
+  const { jumpTo, removeFromQueue, toggleShuffle, cycleRepeat } = usePlayer.getState();
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => e.key === "Escape" && onClose();
@@ -54,13 +56,33 @@ function QueuePanel({ onClose }: { onClose: () => void }) {
   return (
     <aside
       aria-label="Очередь"
-      className="sticker fixed bottom-[calc(var(--player-h)+12px)] right-3 z-50 flex max-h-[60vh] w-[min(380px,calc(100vw-24px))] flex-col rounded-3xl bg-surface"
+      className="sticker fixed bottom-[calc(var(--player-h)+64px+28px)] right-3 z-50 flex max-h-[60vh] w-[min(380px,calc(100vw-24px))] flex-col rounded-3xl bg-surface md:bottom-[calc(var(--player-h)+28px)]"
     >
-      <header className="flex items-center justify-between border-b-2 border-dashed border-surface-2 px-4 py-3">
+      <header className="flex items-center justify-between gap-2 border-b-2 border-dashed border-surface-2 px-4 py-3">
         <h2 className="font-display text-2xl text-accent">Очередь</h2>
-        <button type="button" onClick={onClose} aria-label="Закрыть очередь" className="rounded-full p-1 hover:bg-surface-2">
-          <CloseIcon className="size-5" />
-        </button>
+        {/* На телефоне в нижней панели нет места — перемешивание и повтор живут здесь */}
+        <div className="ml-auto flex items-center gap-1 text-muted">
+          <button
+            type="button"
+            onClick={toggleShuffle}
+            aria-pressed={shuffle}
+            aria-label="Перемешать"
+            className={`grid size-9 place-items-center rounded-full hover:bg-surface-2 ${shuffle ? "text-zombie" : ""}`}
+          >
+            <ShuffleIcon className="size-5" />
+          </button>
+          <button
+            type="button"
+            onClick={cycleRepeat}
+            aria-label={repeat === "off" ? "Повтор выключен" : repeat === "all" ? "Повтор очереди" : "Повтор трека"}
+            className={`grid size-9 place-items-center rounded-full hover:bg-surface-2 ${repeat !== "off" ? "text-zombie" : ""}`}
+          >
+            <RepeatIcon className="size-5" one={repeat === "one"} />
+          </button>
+          <button type="button" onClick={onClose} aria-label="Закрыть очередь" className="grid size-9 place-items-center rounded-full hover:bg-surface-2">
+            <CloseIcon className="size-5" />
+          </button>
+        </div>
       </header>
       <ol className="overflow-y-auto p-2">
         {queue.map((t, i) => (
@@ -80,7 +102,8 @@ function QueuePanel({ onClose }: { onClose: () => void }) {
                 type="button"
                 onClick={() => removeFromQueue(i)}
                 aria-label={`Убрать из очереди: ${t.title}`}
-                className="rounded-full p-1 text-muted opacity-0 hover:text-fg group-hover:opacity-100 focus:opacity-100"
+                // На телефоне наведения нет — крестик виден всегда
+                className="rounded-full p-1 text-muted hover:text-fg md:opacity-0 md:group-hover:opacity-100 md:focus:opacity-100"
               >
                 <CloseIcon className="size-4" />
               </button>
@@ -111,7 +134,8 @@ export function PlayerBar() {
 
   useEffect(() => {
     if (!error) return;
-    const t = setTimeout(() => usePlayer.getState().clearError(), 3500);
+    // «Ничего не включается» — важное сообщение, держим дольше обычных подсказок
+    const t = setTimeout(() => usePlayer.getState().clearError(), error.startsWith("Не получается") ? 10000 : 3500);
     return () => clearTimeout(t);
   }, [error]);
 
@@ -147,9 +171,9 @@ export function PlayerBar() {
         className="lace-top fixed inset-x-0 bottom-16 z-40 border-t-3 border-outline bg-surface/80 backdrop-blur-xl md:bottom-0"
         style={{ height: "var(--player-h)" }}
       >
-        {/* мобильная полоска прогресса */}
-        <div className="absolute inset-x-0 top-0 h-1 bg-surface-2 md:hidden">
-          <div className="h-full bg-accent" style={{ width: `${duration ? (position / duration) * 100 : 0}%` }} />
+        {/* мобильная перемотка: тянется пальцем по всей ширине над плеером */}
+        <div className="absolute inset-x-3 top-1.5 md:hidden">
+          <SeekBar className="bone-range-thin" />
         </div>
 
         <div className="mx-auto grid h-full max-w-[1600px] grid-cols-[1fr_auto] items-center gap-3 px-3 pt-2 md:grid-cols-[minmax(0,1fr)_minmax(0,2fr)_minmax(0,1fr)] md:gap-6 md:px-6">
@@ -169,10 +193,22 @@ export function PlayerBar() {
           </div>
 
           {/* мобильные кнопки */}
-          <div className="flex items-center gap-2 md:hidden">
+          <div className="flex items-center gap-1 md:hidden">
+            <button type="button" onClick={p.prev} aria-label="Предыдущий" className={`${ctrl} size-9 text-muted`}>
+              <PrevIcon className="size-5" />
+            </button>
             {playBtn("size-11")}
-            <button type="button" onClick={() => p.next()} aria-label="Следующий" className={`${ctrl} size-10 text-muted`}>
-              <NextIcon className="size-6" />
+            <button type="button" onClick={() => p.next()} aria-label="Следующий" className={`${ctrl} size-9 text-muted`}>
+              <NextIcon className="size-5" />
+            </button>
+            <button
+              type="button"
+              onClick={() => setQueueOpen((o) => !o)}
+              aria-expanded={queueOpen}
+              aria-label="Очередь"
+              className={`${ctrl} size-9 ${queueOpen ? "text-accent" : "text-muted"}`}
+            >
+              <QueueIcon className="size-5" />
             </button>
           </div>
 

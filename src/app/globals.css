@@ -445,6 +445,23 @@ body {
   opacity: calc(var(--grain-opacity) * 1.8);
 }
 
+/*
+  Облегчённый режим для слабых телефонов (класс .lite ставит скрипт в layout.tsx):
+  размытие «стекла» и плавающие размытые пятна — самое тяжёлое для видеочипа и батареи.
+  Прозрачность панелей остаётся, просто без размытия под ними.
+*/
+.lite * {
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+}
+.lite .bd-blobs span {
+  animation: none;
+  filter: blur(40px);
+}
+.lite .bd-cloud {
+  animation: none;
+}
+
 /* Полоса прокрутки в тон */
 * {
   scrollbar-color: var(--accent-deep) transparent;
@@ -484,6 +501,17 @@ body {
   border-radius: 50%;
   background: var(--bone);
   border: 3px solid var(--outline);
+}
+/* Тонкий вариант для мобильной перемотки: полоска тонкая, но ловить пальцем удобно */
+.bone-range-thin {
+  height: 4px;
+  padding: 8px 0;
+  background-clip: content-box;
+}
+.bone-range-thin::-webkit-slider-thumb {
+  width: 14px;
+  height: 14px;
+  border-width: 2px;
 }
 .bone-range::-moz-range-thumb {
   width: 14px;

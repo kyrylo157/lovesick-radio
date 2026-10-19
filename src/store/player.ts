@@ -4,10 +4,10 @@ import { create } from "zustand";
 import { fullTracksEnabled } from "@/lib/fullMode";
 import { audiusStreamUrl } from "@/lib/stream";
 import type { Track } from "@/lib/types";
-import { setYTHandlers, ytLoad, ytPlay, ytSeek, ytStop, ytToggle, ytVolume } from "@/lib/ytEngine";
+import { setYTHandlers, ytLoad, ytPause, ytPlay, ytSeek, ytStop, ytVolume } from "@/lib/ytEngine";
 
 export type RepeatMode = "off" | "all" | "one";
-/** Чем играем: <audio> (Audius, превью Deezer) или YouTube-плеер (полные версии хитов). */
+/** Чем играем: <audio> (Audius, превью Deezer) или YouTube-плеер (YouTube Music, полные версии хитов). */
 export type Engine = "audio" | "youtube";
 
 interface PlayerState {
@@ -23,11 +23,15 @@ interface PlayerState {
   shuffle: boolean;
   repeat: RepeatMode;
   error: string | null;
+  /** id треков, которые уже отыграли — чтобы «назад» в режиме перемешивания вёл к реально предыдущему. */
+  history: string[];
 
   playList: (tracks: Track[], start?: number) => void;
   playTrack: (track: Track) => void;
   addToQueue: (track: Track) => void;
   toggle: () => void;
+  play: () => void;
+  pause: () => void;
   next: (auto?: boolean) => void;
   prev: () => void;
   seek: (seconds: number) => void;
@@ -50,6 +54,46 @@ let analyser: AnalyserNode | null = null;
 let levelBuf: Uint8Array<ArrayBuffer> | null = null;
 let loadToken = 0;
 
+/*
+  Сколько треков подряд не загрузилось. Сбрасывается, как только что-то заиграло.
+  Без этого при пропавшем интернете и «повторе всего» плеер перебирал бы очередь вечно.
+*/
+let failStreak = 0;
+const MAX_FAILS = 3;
+/** Трек, для которого уже пробовали взять свежую ссылку на превью (они протухают). */
+let refreshedPreviewFor: string | null = null;
+
+const st = () => usePlayer.getState();
+
+/** Загрузка, по которой уже засчитана неудача: на одну неудачу браузер шлёт и ошибку play(), и событие error. */
+let failedLoad = -1;
+
+/** Трек не загрузился: пропускаем, но не больше MAX_FAILS раз подряд. */
+function skipBroken(message: string) {
+  if (failedLoad === loadToken) return;
+  failedLoad = loadToken;
+  failStreak += 1;
+  const s = st();
+  if (failStreak >= Math.min(MAX_FAILS, s.queue.length)) {
+    getAudio().pause();
+    ytStop();
+    usePlayer.setState({
+      playing: false,
+      loading: false,
+      error: "Не получается ничего включить — проверь интернет и попробуй ещё раз",
+    });
+    failStreak = 0;
+    return;
+  }
+  usePlayer.setState({ loading: false, playing: false, error: message });
+  setTimeout(() => st().next(true), 1200);
+}
+
+function markPlaying() {
+  failStreak = 0;
+  refreshedPreviewFor = null;
+}
+
 function getAudio() {
   if (audio) return audio;
   audio = new Audio();
@@ -59,24 +103,34 @@ function getAudio() {
 
   // События <audio> учитываем, только пока играет именно он, а не YouTube.
   const set = (s: Partial<PlayerState>) => {
-    if (usePlayer.getState().engine === "audio") usePlayer.setState(s);
+    if (st().engine === "audio") usePlayer.setState(s);
   };
   audio.addEventListener("play", () => set({ playing: true }));
   audio.addEventListener("pause", () => set({ playing: false }));
   audio.addEventListener("waiting", () => set({ loading: true }));
-  audio.addEventListener("playing", () => set({ loading: false }));
+  audio.addEventListener("playing", () => {
+    if (st().engine === "audio") markPlaying();
+    set({ loading: false });
+  });
   audio.addEventListener("canplay", () => set({ loading: false }));
   audio.addEventListener("timeupdate", () => set({ position: audio!.currentTime }));
   audio.addEventListener("loadedmetadata", () => {
     if (Number.isFinite(audio!.duration)) set({ duration: audio!.duration });
   });
   audio.addEventListener("ended", () => {
-    if (usePlayer.getState().engine === "audio") usePlayer.getState().next(true);
+    if (st().engine === "audio") st().next(true);
   });
   audio.addEventListener("error", () => {
-    if (!audio!.src || usePlayer.getState().engine !== "audio") return;
-    set({ loading: false, playing: false, error: "Этот трек не захотел вставать из могилы — включаю следующий" });
-    setTimeout(() => usePlayer.getState().next(true), 1200);
+    if (!audio!.src || st().engine !== "audio") return;
+    const s = st();
+    const track = s.queue[s.index];
+    // Ссылки на превью Deezer подписаны и протухают (долгая пауза) — один раз берём свежую и продолжаем.
+    if (track?.source === "deezer" && refreshedPreviewFor !== track.id) {
+      refreshedPreviewFor = track.id;
+      void load(track, { forcePreview: true, startAt: s.position, resume: true });
+      return;
+    }
+    skipBroken("Этот трек не захотел вставать из могилы — включаю следующий");
   });
   return audio;
 }
@@ -130,28 +184,42 @@ async function resolveYouTube(track: Track) {
   }
 }
 
-async function load(track: Track | undefined, opts: { forcePreview?: boolean } = {}) {
+interface LoadOptions {
+  /** Играть 30-сек превью, даже если есть полная версия. */
+  forcePreview?: boolean;
+  /** С какой секунды начать (восстановление после перезагрузки, свежая ссылка на превью). */
+  startAt?: number;
+  /** false — только подготовить трек, не запуская (восстановление сессии). */
+  resume?: boolean;
+}
+
+async function load(track: Track | undefined, opts: LoadOptions = {}) {
   const el = getAudio();
   if (!track) {
     el.pause();
     ytStop();
     return;
   }
+  const { forcePreview = false, startAt = 0, resume = true } = opts;
   const token = ++loadToken;
-  usePlayer.setState({ loading: true, position: 0, duration: track.fullDuration ?? track.duration, error: null });
+  usePlayer.setState({
+    loading: resume,
+    position: startAt,
+    duration: track.fullDuration ?? track.duration,
+    error: null,
+  });
   setMediaSession(track);
   ensureAnalyser();
   if (ctx?.state === "suspended") void ctx.resume();
 
   // Трек из YouTube Music играет напрямую; Deezer-трек сначала ищем там же.
-  const videoId =
-    track.source === "youtube" ? track.sourceId : opts.forcePreview ? null : await resolveYouTube(track);
+  const videoId = track.source === "youtube" ? track.sourceId : forcePreview ? null : await resolveYouTube(track);
   if (token !== loadToken) return;
   if (videoId) {
     el.pause();
     usePlayer.setState({ engine: "youtube" });
-    const { volume, muted } = usePlayer.getState();
-    await ytLoad(videoId, volume, muted);
+    const { volume, muted } = st();
+    await ytLoad(videoId, volume, muted, startAt);
     return;
   }
 
@@ -161,6 +229,7 @@ async function load(track: Track | undefined, opts: { forcePreview?: boolean } =
     const src = await resolveSrc(track);
     if (token !== loadToken) return; // пока грузили, пользователь уже переключил
     el.src = src;
+    if (startAt > 0) el.addEventListener("loadedmetadata", () => (el.currentTime = startAt), { once: true });
     await el.play();
   } catch (e) {
     if (token !== loadToken) return;
@@ -170,7 +239,7 @@ async function load(track: Track | undefined, opts: { forcePreview?: boolean } =
       return;
     }
     if (e instanceof DOMException && e.name === "AbortError") return;
-    usePlayer.setState({ loading: false, playing: false, error: "Не получилось достать трек из склепа" });
+    skipBroken("Не получилось достать трек из склепа — включаю следующий");
   }
 }
 
@@ -197,6 +266,13 @@ function pickNext(s: PlayerState, auto: boolean): number | null {
   return s.repeat === "all" || !auto ? 0 : null;
 }
 
+/** Запомнить текущий трек, чтобы «назад» мог к нему вернуться. */
+function pushHistory(s: PlayerState) {
+  const id = s.queue[s.index]?.id;
+  if (!id) return s.history;
+  return [...s.history, id].slice(-50);
+}
+
 export const usePlayer = create<PlayerState>()((set, get) => ({
   engine: "audio",
   queue: [],
@@ -210,10 +286,12 @@ export const usePlayer = create<PlayerState>()((set, get) => ({
   shuffle: false,
   repeat: "off",
   error: null,
+  history: [],
 
   playList: (tracks, start = 0) => {
     if (!tracks.length) return;
-    set({ queue: tracks, index: start });
+    failStreak = 0;
+    set({ queue: tracks, index: start, history: [] });
     void load(tracks[start]);
   },
 
@@ -222,7 +300,7 @@ export const usePlayer = create<PlayerState>()((set, get) => ({
     const existing = queue.findIndex((t) => t.id === track.id);
     if (existing >= 0) return get().jumpTo(existing);
     const nextQueue = [...queue.slice(0, index + 1), track, ...queue.slice(index + 1)];
-    set({ queue: nextQueue, index: index + 1 });
+    set({ queue: nextQueue, index: index + 1, history: pushHistory(get()) });
     void load(track);
   },
 
@@ -233,15 +311,22 @@ export const usePlayer = create<PlayerState>()((set, get) => ({
     if (index < 0) get().jumpTo(0);
   },
 
-  toggle: () => {
-    const el = getAudio();
-    const { index, queue, engine } = get();
+  toggle: () => (get().playing ? get().pause() : get().play()),
+
+  play: () => {
+    const { index, queue, engine, position } = get();
     if (index < 0 || !queue[index]) return;
-    if (engine === "youtube") return ytToggle();
-    if (!el.src) return void load(queue[index]);
+    if (engine === "youtube") return ytPlay();
+    const el = getAudio();
+    // Трек ещё не загружен (например, восстановлен после перезагрузки) — грузим с того же места.
+    if (!el.src) return void load(queue[index], { startAt: position });
     if (ctx?.state === "suspended") void ctx.resume();
-    if (el.paused) void el.play().catch(() => {});
-    else el.pause();
+    void el.play().catch(() => {});
+  },
+
+  pause: () => {
+    if (get().engine === "youtube") return ytPause();
+    getAudio().pause();
   },
 
   next: (auto = false) => {
@@ -254,22 +339,31 @@ export const usePlayer = create<PlayerState>()((set, get) => ({
     }
     if (i === get().index) {
       get().seek(0);
-      if (get().engine === "youtube") ytPlay();
-      else void getAudio().play().catch(() => {});
+      get().play();
       return;
     }
-    set({ index: i });
+    set({ index: i, history: pushHistory(get()) });
     void load(get().queue[i]);
   },
 
   prev: () => {
-    if (get().position > 3 || get().index <= 0) {
-      get().seek(0);
-      return;
+    const s = get();
+    if (s.position > 3) return get().seek(0);
+    // В режиме перемешивания «назад» — к тому, что реально играло до этого.
+    if (s.shuffle && s.history.length) {
+      const history = [...s.history];
+      const id = history.pop()!;
+      const i = s.queue.findIndex((t) => t.id === id);
+      if (i >= 0) {
+        set({ index: i, history });
+        void load(s.queue[i]);
+        return;
+      }
     }
-    const i = get().index - 1;
+    if (s.index <= 0) return get().seek(0);
+    const i = s.index - 1;
     set({ index: i });
-    void load(get().queue[i]);
+    void load(s.queue[i]);
   },
 
   seek: (seconds) => {
@@ -280,7 +374,7 @@ export const usePlayer = create<PlayerState>()((set, get) => ({
       return;
     }
     const el = getAudio();
-    if (!el.src) return;
+    if (!el.src) return set({ position: Math.max(0, seconds) });
     el.currentTime = Math.max(0, Math.min(seconds, el.duration || seconds));
     set({ position: el.currentTime });
   },
@@ -318,7 +412,7 @@ export const usePlayer = create<PlayerState>()((set, get) => ({
   jumpTo: (index) => {
     const track = get().queue[index];
     if (!track) return;
-    set({ index });
+    set({ index, history: pushHistory(get()) });
     void load(track);
   },
 
@@ -331,40 +425,111 @@ export const usePlayer = create<PlayerState>()((set, get) => ({
   clearError: () => set({ error: null }),
 }));
 
-/** Вызывается один раз на клиенте: громкость из прошлого визита + кнопки на экране блокировки. */
+/* ---------- сессия: очередь и место в треке переживают перезагрузку ---------- */
+
+const SESSION_KEY = "lovesick-session";
+
+interface Session {
+  queue: Track[];
+  index: number;
+  position: number;
+  shuffle: boolean;
+  repeat: RepeatMode;
+}
+
+function saveSession() {
+  const s = st();
+  if (s.index < 0) return;
+  const session: Session = {
+    queue: s.queue.slice(0, 200),
+    index: s.index,
+    position: Math.floor(s.position),
+    shuffle: s.shuffle,
+    repeat: s.repeat,
+  };
+  try {
+    localStorage.setItem(SESSION_KEY, JSON.stringify(session));
+  } catch {
+    // память переполнена — сессию не сохраняем, это не критично
+  }
+}
+
+function restoreSession() {
+  try {
+    const raw = localStorage.getItem(SESSION_KEY);
+    if (!raw) return;
+    const s = JSON.parse(raw) as Session;
+    const track = s.queue?.[s.index];
+    if (!track) return;
+    usePlayer.setState({
+      queue: s.queue,
+      index: s.index,
+      position: s.position || 0,
+      duration: track.fullDuration ?? track.duration,
+      shuffle: !!s.shuffle,
+      repeat: s.repeat ?? "off",
+      engine: "audio",
+      playing: false,
+    });
+    setMediaSession(track);
+  } catch {
+    localStorage.removeItem(SESSION_KEY);
+  }
+}
+
+/** Вызывается один раз на клиенте: громкость, сессия, YouTube-события, кнопки на экране блокировки. */
 export function initPlayer() {
   const el = getAudio();
   try {
-    const saved = Number(localStorage.getItem("lovesick-volume"));
-    if (saved >= 0 && saved <= 1 && localStorage.getItem("lovesick-volume") !== null) {
-      el.volume = saved;
-      usePlayer.setState({ volume: saved });
+    const saved = localStorage.getItem("lovesick-volume");
+    const v = Number(saved);
+    if (saved !== null && v >= 0 && v <= 1) {
+      el.volume = v;
+      usePlayer.setState({ volume: v });
     } else {
-      el.volume = usePlayer.getState().volume;
+      el.volume = st().volume;
     }
   } catch {
-    el.volume = usePlayer.getState().volume;
+    el.volume = st().volume;
   }
+
+  restoreSession();
+  // Сохраняем не чаще раза в 5 сек и обязательно при уходе со страницы.
+  let lastSave = 0;
+  usePlayer.subscribe((s, prev) => {
+    const now = Date.now();
+    const important = s.index !== prev.index || s.queue !== prev.queue || s.shuffle !== prev.shuffle || s.repeat !== prev.repeat;
+    if (important || now - lastSave > 5000) {
+      lastSave = now;
+      saveSession();
+    }
+  });
+  window.addEventListener("pagehide", saveSession);
+
   // События YouTube-плеера учитываем, только пока играет именно он.
   const yt = (s: Partial<PlayerState>) => {
-    if (usePlayer.getState().engine === "youtube") usePlayer.setState(s);
+    if (st().engine === "youtube") usePlayer.setState(s);
   };
   setYTHandlers({
     onState: (state) => {
-      if (state === "playing") yt({ playing: true, loading: false });
-      else if (state === "paused") yt({ playing: false });
+      if (state === "playing") {
+        if (st().engine === "youtube") markPlaying();
+        yt({ playing: true, loading: false, error: null });
+      } else if (state === "paused") yt({ playing: false, loading: false });
       else if (state === "buffering") yt({ loading: true });
-      else if (state === "ended" && usePlayer.getState().engine === "youtube") usePlayer.getState().next(true);
+      else if (state === "blocked") {
+        // Браузер (чаще всего Safari на iPhone) не дал YouTube стартовать без нажатия.
+        yt({ playing: false, loading: false, error: "Нажми ▶ — браузер не дал включить звук сам" });
+      } else if (state === "ended" && st().engine === "youtube") st().next(true);
     },
     onTime: (position, duration) => yt(duration ? { position, duration } : { position }),
-    // 101/150 — владелец запретил встраивание, 100 — видео удалено: играем хотя бы превью.
+    // 101/150 — владелец запретил встраивание, 100 — видео удалено.
     onError: () => {
-      const s = usePlayer.getState();
+      const s = st();
       if (s.engine !== "youtube") return;
       // У трека из YouTube Music превью нет — просто идём дальше.
       if (s.queue[s.index]?.source === "youtube") {
-        usePlayer.setState({ error: "Это видео нельзя встроить — включаю следующий" });
-        setTimeout(() => usePlayer.getState().next(true), 1200);
+        skipBroken("Это видео нельзя встроить — включаю следующий");
         return;
       }
       usePlayer.setState({ error: "Полная версия недоступна — включаю 30-секундное превью" });
@@ -373,11 +538,10 @@ export function initPlayer() {
   });
 
   if ("mediaSession" in navigator) {
-    const s = () => usePlayer.getState();
-    navigator.mediaSession.setActionHandler("play", () => s().toggle());
-    navigator.mediaSession.setActionHandler("pause", () => s().toggle());
-    navigator.mediaSession.setActionHandler("nexttrack", () => s().next());
-    navigator.mediaSession.setActionHandler("previoustrack", () => s().prev());
+    navigator.mediaSession.setActionHandler("play", () => st().play());
+    navigator.mediaSession.setActionHandler("pause", () => st().pause());
+    navigator.mediaSession.setActionHandler("nexttrack", () => st().next());
+    navigator.mediaSession.setActionHandler("previoustrack", () => st().prev());
   }
 }
 

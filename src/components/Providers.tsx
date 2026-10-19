@@ -3,6 +3,7 @@
 import { useEffect } from "react";
 import { useLibrary } from "@/store/library";
 import { initPlayer, usePlayer } from "@/store/player";
+import { StorageWarning } from "./StorageWarning";
 
 export function Providers({ children }: { children: React.ReactNode }) {
   useEffect(() => {
@@ -21,5 +22,10 @@ export function Providers({ children }: { children: React.ReactNode }) {
     return () => window.removeEventListener("keydown", onKey);
   }, []);
 
-  return children;
+  return (
+    <>
+      {children}
+      <StorageWarning />
+    </>
+  );
 }

@@ -49,7 +49,7 @@ export default async function Home() {
         </div>
       </section>
 
-      <Section title="Свежее из склепа" note="Тренды недели на Audius — играют целиком" href="/mood/graveyard-lofi">
+      <Section title="Свежее из склепа" note="Тренды недели на Audius — играют целиком" href="/fresh">
         {fresh.length ? (
           <TrackShelf tracks={fresh} />
         ) : (

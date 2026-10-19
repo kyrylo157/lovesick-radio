@@ -19,10 +19,14 @@ export function YouTubeDock() {
     <aside
       aria-label="Видео YouTube"
       hidden={!active}
-      className="sticker fixed inset-x-3 bottom-[calc(var(--player-h)+64px+12px)] z-40 overflow-hidden rounded-2xl bg-ink md:inset-x-auto md:bottom-[calc(var(--player-h)+12px)] md:right-4 md:w-[356px]"
+      // На телефоне — квадрат 200×200 в углу (меньше правила YouTube не разрешают), на ПК — 356×200.
+      // Отступ снизу учитывает кружевную кромку над плеером (~22px), чтобы она не налезала на видео.
+      className="sticker fixed bottom-[calc(var(--player-h)+64px+28px)] right-3 z-40 w-[200px] overflow-hidden rounded-2xl bg-ink md:bottom-[calc(var(--player-h)+28px)] md:right-4 md:w-[356px]"
     >
-      <div className="flex items-center justify-between gap-2 border-b-2 border-outline bg-surface px-3 py-1.5 text-xs font-extrabold">
-        <span className="text-muted">Полная версия · YouTube</span>
+      <div className="flex items-center justify-between gap-2 border-b-2 border-outline bg-surface px-3 py-1 text-xs font-extrabold">
+        <span className="truncate text-muted">
+          <span className="hidden md:inline">Полная версия · </span>YouTube
+        </span>
         {hasPreview && (
           <button type="button" onClick={playPreviewInstead} className="rounded-full px-2 py-0.5 text-accent hover:bg-surface-2">
             Превью

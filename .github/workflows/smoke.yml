@@ -1,0 +1,28 @@
+# После каждой выкладки на Vercel (production) прогоняет смоук-тест на живом сайте в настоящем браузере.
+# Упал — GitHub пришлёт письмо, а в логе будет видно, какая проверка не прошла.
+name: Смоук-тест после выкладки
+
+on:
+  deployment_status:
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+jobs:
+  smoke:
+    if: github.event_name == 'workflow_dispatch' || (github.event.deployment_status.state == 'success' && github.event.deployment.environment == 'Production')
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium
+      - name: Смоук-тест
+        env:
+          BASE: https://lovesick-radio.vercel.app
+        run: npm run test:smoke

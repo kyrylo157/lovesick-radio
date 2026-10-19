@@ -1,8 +1,9 @@
 /**
- * Обложка плейлиста: обрезаем картинку по центру в квадрат и ужимаем до 400×400 JPEG.
- * Результат — data URL ~30–60 КБ, его можно хранить прямо в localStorage вместе с плейлистом.
+ * Обложка плейлиста: обрезаем картинку по центру в квадрат и ужимаем до 320×320 JPEG.
+ * Результат — data URL ~20–35 КБ, его можно хранить прямо в localStorage вместе с плейлистом
+ * (там всего ~5 МБ на сайт, поэтому крупнее не делаем).
  */
-export async function fileToCover(file: File, size = 400): Promise<string> {
+export async function fileToCover(file: File, size = 320): Promise<string> {
   if (!file.type.startsWith("image/")) throw new Error("Это не картинка");
   const bitmap = await createImageBitmap(file);
   const side = Math.min(bitmap.width, bitmap.height);
@@ -23,5 +24,5 @@ export async function fileToCover(file: File, size = 400): Promise<string> {
     size,
   );
   bitmap.close();
-  return canvas.toDataURL("image/jpeg", 0.85);
+  return canvas.toDataURL("image/jpeg", 0.8);
 }
