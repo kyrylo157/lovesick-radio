@@ -1,0 +1,543 @@
+@import "tailwindcss";
+
+/*
+  Lovesick Radio — дизайн-токены.
+  Весь стиль сайта живёт здесь: чтобы перекрасить сайт, меняй только этот блок.
+  Палитра снята с референсов: малиновый в горошек, чёрное кружево, зомби-зелёный, кость.
+*/
+:root {
+  --ink: #140910; /* «чёрный» с уходом в сливу — как кружево на референсе */
+  --crypt: #1f0e18;
+  --lace: #2e1424;
+  --raspberry: #c2185b;
+  --bubblegum: #ff4fa0;
+  --blush: #f8c8dc;
+  --zombie: #7fa046;
+  --zombie-deep: #4d6b2a;
+  --bone: #f5eef0;
+  --rose: #b3122e;
+
+  /* Семантика — компоненты используют только эти имена */
+  --bg: var(--ink);
+  --surface: var(--crypt);
+  --surface-2: var(--lace);
+  --fg: var(--bone);
+  --muted: #c9a9b8;
+  --accent: var(--bubblegum);
+  --accent-deep: var(--raspberry);
+  --outline: #050204;
+  --dots: rgba(20, 9, 16, 0.55);
+
+  /* Объёмный фон: свечения, виньетка, зерно, летающие штучки */
+  --glow-pink: rgba(255, 79, 160, 0.3);
+  --glow-rasp: rgba(194, 24, 91, 0.32);
+  --glow-green: rgba(127, 160, 70, 0.22);
+  --vignette: rgba(0, 0, 0, 0.6);
+  --grain-opacity: 0.09;
+  --lace-ink: rgba(255, 79, 160, 0.14);
+  --moon: #f8c8dc;
+  --moon-edge: #d9739f;
+  --moon-crater: rgba(194, 24, 91, 0.16);
+  --cloud: rgba(248, 200, 220, 0.1);
+  --grave: #070306;
+  --grave-rim: rgba(255, 79, 160, 0.35);
+
+  --sticker-shadow: 4px 4px 0 var(--outline);
+  --radius-blob: 28px;
+  --radius-card: 18px;
+  --player-h: 88px;
+}
+
+/* Светлая тема «Валентинка» */
+:root[data-theme="light"] {
+  --bg: #fde4ee;
+  --surface: #fff5f9;
+  --surface-2: #f8c8dc;
+  --fg: #2a0f1d;
+  --muted: #7d4a62;
+  --accent: var(--raspberry);
+  --accent-deep: #8e0f43;
+  --outline: #2a0f1d;
+  --dots: rgba(42, 15, 29, 0.35);
+
+  --glow-pink: rgba(255, 79, 160, 0.35);
+  --glow-rasp: rgba(194, 24, 91, 0.2);
+  --glow-green: rgba(127, 160, 70, 0.25);
+  --vignette: rgba(120, 20, 70, 0.22);
+  --grain-opacity: 0.06;
+  --lace-ink: rgba(194, 24, 91, 0.12);
+  --cloud: rgba(255, 255, 255, 0.6);
+  --grave: rgba(110, 12, 52, 0.55);
+  --grave-rim: rgba(255, 255, 255, 0.5);
+}
+
+@theme inline {
+  --color-bg: var(--bg);
+  --color-surface: var(--surface);
+  --color-surface-2: var(--surface-2);
+  --color-fg: var(--fg);
+  --color-muted: var(--muted);
+  --color-accent: var(--accent);
+  --color-accent-deep: var(--accent-deep);
+  --color-outline: var(--outline);
+  --color-zombie: var(--zombie);
+  --color-zombie-deep: var(--zombie-deep);
+  --color-bone: var(--bone);
+  --color-rose: var(--rose);
+  --color-blush: var(--blush);
+  --color-raspberry: var(--raspberry);
+  --color-ink: var(--ink);
+
+  --font-display: var(--font-wet-paint);
+  --font-sans: var(--font-nunito);
+
+  --radius-blob: var(--radius-blob);
+  --radius-card: var(--radius-card);
+}
+
+html {
+  color-scheme: dark;
+}
+:root[data-theme="light"] {
+  color-scheme: light;
+}
+
+body {
+  background: var(--bg);
+  color: var(--fg);
+  font-family: var(--font-nunito), system-ui, sans-serif;
+}
+
+::selection {
+  background: var(--accent);
+  color: var(--ink);
+}
+
+:focus-visible {
+  outline: 3px solid var(--zombie);
+  outline-offset: 2px;
+  border-radius: 6px;
+}
+
+/* ---------- фирменные приёмы ---------- */
+
+/* Наклейка: толстая обводка + жёсткая тень без размытия, как стикер */
+.sticker {
+  border: 3px solid var(--outline);
+  box-shadow: var(--sticker-shadow);
+}
+
+/* Матовое стекло: полупрозрачно, размывает фон, сверху тонкий блик */
+.glass {
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.08), rgba(255, 255, 255, 0.02)),
+    color-mix(in srgb, var(--surface) 45%, transparent);
+  backdrop-filter: blur(14px) saturate(1.3);
+  -webkit-backdrop-filter: blur(14px) saturate(1.3);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.12),
+    0 8px 24px rgba(0, 0, 0, 0.25);
+}
+
+/*
+  «Глубокая» кнопка: объёмная плитка с бликом сверху и толстым краем снизу,
+  при наведении проседает, при нажатии вдавливается. Цвет — через --tint.
+*/
+.deep {
+  --depth: 7px;
+  position: relative;
+  border: 3px solid var(--outline);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.28) 0%, rgba(255, 255, 255, 0.06) 42%, transparent 43%),
+    linear-gradient(180deg, color-mix(in srgb, var(--tint) 88%, white), var(--tint) 55%, color-mix(in srgb, var(--tint) 78%, black));
+  box-shadow:
+    0 var(--depth) 0 -1px color-mix(in srgb, var(--tint) 45%, black),
+    0 var(--depth) 0 2px var(--outline),
+    inset 0 2px 0 rgba(255, 255, 255, 0.35),
+    inset 0 -6px 12px rgba(0, 0, 0, 0.22);
+  transform: translateY(0);
+  transition:
+    transform 120ms ease,
+    box-shadow 120ms ease;
+}
+.deep:hover {
+  --depth: 4px;
+  transform: translateY(3px);
+}
+.deep:active {
+  --depth: 1px;
+  transform: translateY(6px);
+}
+
+/* Малиновый в чёрный горошек — фон из третьего референса */
+.polka {
+  background-color: var(--raspberry);
+  background-image: radial-gradient(var(--dots) 4.5px, transparent 5px);
+  background-size: 28px 28px;
+}
+
+/*
+  Кружевная кромка: малиновые фестоны с дырочками на ::before/::after.
+  Позиционирование (relative/fixed) задаёт сам элемент — здесь его не трогаем,
+  иначе этот класс перебьёт `fixed` у плеера.
+*/
+.lace-bottom::after,
+.lace-top::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 22px;
+  pointer-events: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='32' height='22' viewBox='0 0 32 22'%3E%3Cpath d='M0 0h32v6c0 7-7 12-16 12S0 13 0 6z' fill='%23c2185b' stroke='%23050204' stroke-width='2'/%3E%3Ccircle cx='16' cy='8' r='2.4' fill='%23050204'/%3E%3Ccircle cx='6' cy='4' r='1.3' fill='%23050204'/%3E%3Ccircle cx='26' cy='4' r='1.3' fill='%23050204'/%3E%3C/svg%3E");
+  background-size: 32px 22px;
+  /* round — фестоны слегка растягиваются, чтобы последний не обрывался на краю */
+  background-repeat: round no-repeat;
+}
+.lace-bottom::after {
+  bottom: -20px;
+  left: 18px;
+  right: 18px;
+  z-index: 2;
+}
+/* У плеера кромка смотрит вверх: тот же фестон, перевёрнутый */
+.lace-top::before {
+  top: -20px;
+  transform: scaleY(-1);
+  z-index: 2;
+}
+
+/* Чёрное кружево по бокам героя — слоями поверх горошка, если он есть */
+:root {
+  --lace-tile: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='60' height='60' viewBox='0 0 60 60'%3E%3Cg fill='none' stroke='%23140910' stroke-width='2.4'%3E%3Ccircle cx='30' cy='30' r='12'/%3E%3Ccircle cx='30' cy='30' r='5'/%3E%3Cpath d='M30 4c6 8 6 10 0 14-6-4-6-6 0-14zM30 56c6-8 6-10 0-14-6 4-6 6 0 14zM4 30c8-6 10-6 14 0-4 6-6 6-14 0zM56 30c-8-6-10-6-14 0 4 6 6 6 14 0z'/%3E%3C/g%3E%3C/svg%3E");
+}
+.lace-sides {
+  background-image: var(--lace-tile), var(--lace-tile);
+  background-repeat: repeat-y;
+  background-position: left -18px top, right -18px top;
+  background-size: 60px 60px;
+}
+.polka.lace-sides {
+  background-image: var(--lace-tile), var(--lace-tile), radial-gradient(var(--dots) 4.5px, transparent 5px);
+  background-repeat: repeat-y, repeat-y, repeat;
+  background-position: left -18px top, right -18px top, 0 0;
+  background-size: 60px 60px, 60px 60px, 28px 28px;
+}
+
+/* ---------- объёмный фон (components/Backdrop.tsx) ---------- */
+
+.backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: -10;
+  overflow: hidden;
+  pointer-events: none;
+  --scroll: 0;
+}
+.backdrop > div {
+  position: absolute;
+  inset: 0;
+}
+
+/* Свечения по углам — общий слой для всех вариантов */
+.bd-glow {
+  background:
+    radial-gradient(55% 45% at 12% 0%, var(--glow-pink), transparent 70%),
+    radial-gradient(40% 40% at 92% 12%, var(--glow-rasp), transparent 70%),
+    radial-gradient(50% 45% at 85% 100%, var(--glow-green), transparent 70%),
+    radial-gradient(45% 40% at 20% 95%, var(--glow-rasp), transparent 70%);
+}
+
+.bd-vignette {
+  background: radial-gradient(ellipse 85% 75% at 55% 45%, transparent 45%, var(--vignette) 100%);
+}
+
+/* Плёночное зерно — убирает «пластиковую» гладкость */
+.bd-grain {
+  opacity: var(--grain-opacity);
+  mix-blend-mode: overlay;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 1 0 0 0 0 1 0 0 0 0 1 0 0 0 1.4 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+
+/* Варианты: всё специфичное по умолчанию скрыто */
+.bd-blobs,
+.bd-lace,
+.bd-velvet,
+.bd-moon {
+  display: none;
+}
+
+/* 1. Туман — большие размытые пятна медленно плывут */
+:root:not([data-bg]) .bd-blobs,
+[data-bg="fog"] .bd-blobs {
+  display: block;
+}
+.bd-blobs span {
+  position: absolute;
+  border-radius: 50%;
+  filter: blur(70px);
+  animation: blob-drift 26s ease-in-out infinite alternate;
+}
+.bd-blobs span:nth-child(1) {
+  width: 46vw;
+  height: 46vw;
+  left: -8vw;
+  top: 20vh;
+  background: var(--glow-pink);
+}
+.bd-blobs span:nth-child(2) {
+  width: 38vw;
+  height: 38vw;
+  right: -6vw;
+  top: -10vh;
+  background: var(--glow-green);
+  animation-duration: 32s;
+  animation-delay: -8s;
+}
+.bd-blobs span:nth-child(3) {
+  width: 34vw;
+  height: 34vw;
+  right: 18vw;
+  bottom: -14vh;
+  background: var(--glow-rasp);
+  animation-duration: 22s;
+  animation-delay: -14s;
+}
+@keyframes blob-drift {
+  0% {
+    transform: translate(0, 0) scale(1);
+  }
+  50% {
+    transform: translate(6vw, -5vh) scale(1.12);
+  }
+  100% {
+    transform: translate(-4vw, 6vh) scale(0.94);
+  }
+}
+
+/* 2. Кружевные обои — узор в тон, едет медленнее страницы */
+[data-bg="lace"] .bd-lace {
+  display: block;
+  inset: -200px 0 0 0;
+  transform: translateY(calc(var(--scroll) * -0.15px));
+  /*
+    Узор симметричен по обеим осям: розетка с четырьмя лепестками в центре,
+    сердечки по диагоналям, на углах половинки кругов — у соседних плиток они смыкаются в целые.
+    Узор — это маска, цвет берётся из токена, поэтому работает в обеих темах.
+  */
+  --lace-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120' viewBox='0 0 120 120'%3E%3Cg fill='none' stroke='black' stroke-width='1.6' stroke-linejoin='round'%3E%3Ccircle cx='60' cy='60' r='18'/%3E%3Ccircle cx='60' cy='60' r='7'/%3E%3Cpath d='M60 42C66 34 66 28 60 20C54 28 54 34 60 42ZM60 78C66 86 66 92 60 100C54 92 54 86 60 78ZM42 60C34 66 28 66 20 60C28 54 34 54 42 60ZM78 60C86 66 92 66 100 60C92 54 86 54 78 60Z'/%3E%3Cpath d='M30 35c-6-4-8-8-5-10.5c2-1.3 4-.6 5 1c1-1.6 3-2.3 5-1c3 2.5 1 6.5-5 10.5zM90 35c-6-4-8-8-5-10.5c2-1.3 4-.6 5 1c1-1.6 3-2.3 5-1c3 2.5 1 6.5-5 10.5zM30 95c-6-4-8-8-5-10.5c2-1.3 4-.6 5 1c1-1.6 3-2.3 5-1c3 2.5 1 6.5-5 10.5zM90 95c-6-4-8-8-5-10.5c2-1.3 4-.6 5 1c1-1.6 3-2.3 5-1c3 2.5 1 6.5-5 10.5z'/%3E%3Ccircle cx='0' cy='0' r='14'/%3E%3Ccircle cx='120' cy='0' r='14'/%3E%3Ccircle cx='0' cy='120' r='14'/%3E%3Ccircle cx='120' cy='120' r='14'/%3E%3Ccircle cx='0' cy='0' r='5'/%3E%3Ccircle cx='120' cy='0' r='5'/%3E%3Ccircle cx='0' cy='120' r='5'/%3E%3Ccircle cx='120' cy='120' r='5'/%3E%3Cpath d='M14 2Q60 16 106 2M14 118Q60 104 106 118M2 14Q16 60 2 106M118 14Q104 60 118 106'/%3E%3Ccircle cx='60' cy='0' r='3'/%3E%3Ccircle cx='60' cy='120' r='3'/%3E%3Ccircle cx='0' cy='60' r='3'/%3E%3Ccircle cx='120' cy='60' r='3'/%3E%3C/g%3E%3C/svg%3E");
+  background-color: var(--lace-ink);
+  -webkit-mask: var(--lace-mask) 0 0 / 120px 120px repeat;
+  mask: var(--lace-mask) 0 0 / 120px 120px repeat;
+}
+
+/* 3. Луна — три глубины: луна далеко, облака посередине, кладбище близко */
+[data-bg="moon"] .bd-moon {
+  display: block;
+}
+/* Луна висит чуть ниже середины экрана справа: там между блоками и за списками фон виден */
+.bd-moon-disk {
+  position: absolute;
+  right: 5vw;
+  top: 42vh;
+  width: clamp(170px, 24vw, 360px);
+  aspect-ratio: 1;
+  border-radius: 50%;
+  background:
+    radial-gradient(circle at 30% 68%, var(--moon-crater) 0 9%, transparent 10%),
+    radial-gradient(circle at 63% 36%, var(--moon-crater) 0 6%, transparent 7%),
+    radial-gradient(circle at 72% 74%, var(--moon-crater) 0 4.5%, transparent 5.5%),
+    radial-gradient(circle at 36% 30%, #fff7fa, var(--moon) 55%, var(--moon-edge) 100%);
+  box-shadow:
+    0 0 60px 18px var(--glow-pink),
+    0 0 200px 90px var(--glow-rasp);
+  /* приглушена: это фон, текст поверх неё должен читаться */
+  opacity: 0.55;
+  transform: translateY(calc(var(--scroll) * -0.03px));
+}
+.bd-cloud {
+  position: absolute;
+  left: 0;
+  width: 42vw;
+  height: 9vw;
+  border-radius: 50%;
+  background: var(--cloud);
+  filter: blur(30px);
+  animation: cloud-drift 110s linear infinite;
+}
+.bd-cloud:nth-child(2) {
+  top: 16vh;
+}
+.bd-cloud:nth-child(3) {
+  top: 34vh;
+  width: 30vw;
+  animation-duration: 150s;
+  animation-delay: -60s;
+}
+.bd-cloud:nth-child(4) {
+  top: 6vh;
+  width: 24vw;
+  animation-duration: 90s;
+  animation-delay: -30s;
+}
+@keyframes cloud-drift {
+  from {
+    transform: translateX(-50vw);
+  }
+  to {
+    transform: translateX(110vw);
+  }
+}
+.bd-graves {
+  position: absolute;
+  left: 0;
+  bottom: 0;
+  width: 100%;
+  height: 28vh;
+  color: var(--grave);
+  filter: drop-shadow(0 -2px 0 var(--grave-rim));
+}
+
+/* 5. Обычный — как в первой версии: ровный цвет темы, без свечения, зерна и узоров */
+[data-bg="plain"] .backdrop {
+  display: none;
+}
+
+/* Мини-превью фонов в меню выбора */
+.bg-swatch-plain {
+  background: var(--bg);
+}
+.bg-swatch-fog {
+  background:
+    radial-gradient(circle at 20% 15%, rgba(255, 79, 160, 0.7), transparent 60%),
+    radial-gradient(circle at 85% 95%, rgba(127, 160, 70, 0.6), transparent 60%),
+    #140910;
+}
+.bg-swatch-lace {
+  background:
+    radial-gradient(circle, transparent 3px, rgba(255, 79, 160, 0.55) 3.5px, transparent 4.5px) 0 0 / 12px 12px,
+    #1f0e18;
+}
+.bg-swatch-velvet {
+  background: repeating-linear-gradient(90deg, #1a0912 0 3px, #6a1d44 6px, #1a0912 10px);
+}
+.bg-swatch-moon {
+  background:
+    radial-gradient(circle at 68% 32%, #f8c8dc 0 20%, transparent 22%),
+    linear-gradient(to top, #050204 0 24%, transparent 24%),
+    #2a1024;
+}
+
+/* 4. Бархат — вертикальные складки занавеса со светом сверху */
+[data-bg="velvet"] .bd-velvet {
+  display: block;
+  background:
+    linear-gradient(180deg, rgba(255, 79, 160, 0.16), transparent 35%, transparent 75%, rgba(0, 0, 0, 0.35)),
+    repeating-linear-gradient(
+      90deg,
+      rgba(0, 0, 0, 0.32) 0px,
+      rgba(194, 24, 91, 0.1) 38px,
+      rgba(255, 140, 190, 0.1) 52px,
+      rgba(194, 24, 91, 0.08) 66px,
+      rgba(0, 0, 0, 0.32) 110px
+    );
+}
+[data-bg="velvet"] .bd-grain {
+  opacity: calc(var(--grain-opacity) * 1.8);
+}
+
+/* Полоса прокрутки в тон */
+* {
+  scrollbar-color: var(--accent-deep) transparent;
+  scrollbar-width: thin;
+}
+
+/* Горизонтальные ленты карточек */
+.shelf {
+  scroll-snap-type: x mandatory;
+  scrollbar-width: none;
+}
+.shelf::-webkit-scrollbar {
+  display: none;
+}
+.shelf > * {
+  scroll-snap-align: start;
+}
+
+/* range-слайдер в виде косточки */
+.bone-range {
+  -webkit-appearance: none;
+  appearance: none;
+  height: 8px;
+  border-radius: 999px;
+  background: linear-gradient(
+    to right,
+    var(--accent) 0%,
+    var(--accent) var(--fill, 0%),
+    var(--surface-2) var(--fill, 0%)
+  );
+  cursor: pointer;
+}
+.bone-range::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: var(--bone);
+  border: 3px solid var(--outline);
+}
+.bone-range::-moz-range-thumb {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: var(--bone);
+  border: 3px solid var(--outline);
+}
+
+/* ---------- анимации ---------- */
+
+@keyframes heart-pop {
+  0% {
+    transform: translate(0, 0) scale(0.4) rotate(0);
+    opacity: 1;
+  }
+  100% {
+    transform: translate(var(--dx), var(--dy)) scale(1) rotate(var(--rot));
+    opacity: 0;
+  }
+}
+.burst-bit {
+  animation: heart-pop 700ms cubic-bezier(0.2, 0.7, 0.3, 1) forwards;
+}
+
+@keyframes float-bob {
+  0%,
+  100% {
+    transform: translateY(0) rotate(-2deg);
+  }
+  50% {
+    transform: translateY(-10px) rotate(2deg);
+  }
+}
+.float-bob {
+  animation: float-bob 5s ease-in-out infinite;
+}
+
+@keyframes wing-flap {
+  0%,
+  100% {
+    transform: rotate(0deg);
+  }
+  50% {
+    transform: rotate(-14deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
