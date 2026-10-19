@@ -6,7 +6,10 @@ import { chromium, devices } from "playwright";
 const BASE = (process.env.BASE ?? "http://localhost:3000").replace(/\/$/, "");
 const results = [];
 const pageErrors = [];
-const check = (name, ok, extra = "") => results.push({ name, ok: !!ok, extra });
+const check = (name, ok, extra = "", { soft = false } = {}) => results.push({ name, ok: !!ok, extra, soft });
+// На серверах GitHub (CI=true) YouTube не даёт играть видео с адресов датацентров —
+// там это предупреждение, а не провал. С обычного компьютера проверка строгая.
+const SOFT_IN_CI = { soft: process.env.CI === "true" };
 const player = (p) => p.locator('section[aria-label="Плеер"]');
 const position = async (p) => Number(await player(p).locator('input[aria-label="Перемотка"]').first().inputValue());
 
@@ -68,7 +71,12 @@ try {
   const dock = p.getByRole("complementary", { name: "Видео YouTube" });
   await dock.waitFor({ state: "visible", timeout: 15000 }).catch(() => {});
   await p.waitForTimeout(8000);
-  check("песня из YouTube Music играет", (await dock.isVisible()) && (await position(p)) > 1, `позиция ${(await position(p)).toFixed(1)}`);
+  check(
+    "песня из YouTube Music играет",
+    (await dock.isVisible()) && (await position(p)) > 1,
+    `позиция ${(await position(p)).toFixed(1)}`,
+    SOFT_IN_CI,
+  );
 
   await first.locator('a[href^="/track/"]').click();
   await p.waitForURL("**/track/**");
@@ -95,7 +103,11 @@ try {
 }
 
 check("нет ошибок на страницах", pageErrors.length === 0, [...new Set(pageErrors)].join(" | "));
-for (const r of results) console.log(`${r.ok ? "PASS" : "FAIL"} ${r.name}${r.extra ? " — " + r.extra : ""}`);
-const failed = results.filter((r) => !r.ok).length;
-console.log(`\n${results.length - failed}/${results.length} прошло`);
+for (const r of results) {
+  const mark = r.ok ? "PASS" : r.soft ? "WARN" : "FAIL";
+  console.log(`${mark} ${r.name}${r.extra ? " — " + r.extra : ""}`);
+}
+const failed = results.filter((r) => !r.ok && !r.soft).length;
+const warned = results.filter((r) => !r.ok && r.soft).length;
+console.log(`\n${results.length - failed - warned}/${results.length} прошло${warned ? `, предупреждений: ${warned}` : ""}`);
 process.exit(failed ? 1 : 0);
