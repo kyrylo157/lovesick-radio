@@ -1,50 +1,61 @@
 # Lovesick Radio 🦇
 
-Музыкальный сайт в стиле cute halloween: розовый горошек, чёрное кружево, зомби-зелёный.
+**Music streaming website in a "cute halloween" style** — pink polka dots, black lace, zombie green.
+Full-length indie tracks, world charts, moods, playlists and an animated mascot that dances to the music.
 
-## Запуск
+**🔗 Live demo: [lovesick-radio.vercel.app](https://lovesick-radio.vercel.app)**
 
+![Lovesick Radio — home page](docs/desktop.png)
+
+<p align="center"><img src="docs/mobile.png" width="280" alt="Lovesick Radio on mobile"></p>
+
+## Features
+
+- **Three music sources in one player** — Audius (full indie tracks), Deezer (world charts and search),
+  YouTube (full versions of chart hits through the official embedded player)
+- **Player** — queue, shuffle, repeat, real-time audio analysis that drives the animations
+- **Library** — likes and playlists with generated covers
+- **Smart search** — understands Cyrillic spelling of artist names («дрейк» → Drake)
+- **Moods** — genre collections with halloween names
+- **Hand-drawn SVG mascots** and layered animated backgrounds (fog, lace, velvet, moon)
+- **Responsive** — works on desktop and phones
+
+## Tech stack
+
+Next.js 16 (App Router, `"use cache"`) · React 19 · TypeScript · Tailwind CSS 4 · Zustand · Playwright · Vercel
+
+## Engineering
+
+- **Rate limiting** per IP for search and track lookup (`src/proxy.ts`)
+- **Security headers** — CSP, frame protection (`next.config.ts`)
+- **Smoke tests** in a real browser run automatically on GitHub after every Vercel deploy
+- **Health monitoring** — `/api/health` checks Audius, Deezer and YouTube Music every 6 hours via GitHub Actions
+  and sends an email if something is down
+
+## Run locally
+
+```bash
+npm install
+npm run dev                       # http://localhost:3000
+npm run build && npx next start   # production build
+npm run test:smoke                # browser smoke test
 ```
-npm run dev        # разработка → http://localhost:3000
-npm run build && npx next start -p 3123   # как на проде
-```
 
-## Откуда музыка
+Optional: `YOUTUBE_API_KEY` in `.env.local` enables full-length versions of chart hits
+(without it they play as 30-second previews).
 
-| Источник | Что даёт | Ключ |
-|---|---|---|
-| Audius | инди-треки **целиком**, тренды, жанры | не нужен |
-| Deezer | мировые чарты и поиск, **30-сек превью** + ссылка на полную версию | не нужен |
+## Project structure
 
-| YouTube | **полные версии** хитов из Deezer через официальный встраиваемый плеер | `YOUTUBE_API_KEY` в `.env.local` |
+| Path | What's inside |
+|---|---|
+| `src/app/globals.css` | the whole design: palette, fonts, polka dots, lace |
+| `src/components/Mascots.tsx` | SVG mascots |
+| `src/store/player.ts` | player: queue, shuffle, repeat, audio analysis |
+| `src/store/library.ts` | likes and playlists |
+| `src/lib/audius.ts`, `deezer.ts`, `youtube.ts` | music sources |
+| `src/lib/ytEngine.ts`, `src/components/YouTubeDock.tsx` | second player engine (YouTube) |
+| `src/lib/translit.ts` | Cyrillic → Latin search |
 
-Без ключа YouTube хиты играют 30-сек превью. С ключом — целиком, в окошке YouTube над плеером
-(правила YouTube требуют, чтобы плеер был виден). Квота бесплатного ключа ≈ 100 новых треков в день,
-найденные видео кэшируются. Ключ читается при сборке — после добавления нужен `npm run build`.
+---
 
-Поиск понимает русское написание: «ту холис» → 2hollis, «дрейк» → Drake (`src/lib/translit.ts`).
-
-## Где что лежит
-
-- `src/app/globals.css` — **весь дизайн**: палитра, шрифты, горошек, кружево. Редизайн начинать отсюда.
-- `src/components/Mascots.tsx` — маскоты (зомбик, мышь-капля, череп-сердце), чистый SVG.
-- `src/store/player.ts` — плеер: очередь, перемешка, повтор, анализ звука для анимаций.
-- `src/store/library.ts` — лайки и плейлисты с обложками (пока в localStorage браузера).
-- `src/components/Backdrop.tsx` + `src/lib/backdrops.ts` — объёмные фоны (туман, кружево, бархат, луна).
-- `src/lib/ytEngine.ts`, `src/components/YouTubeDock.tsx` — второй движок плеера (YouTube).
-- `src/lib/audius.ts`, `src/lib/deezer.ts` — источники; кэш через `"use cache"` (Next 16).
-- `src/lib/moods.ts` — «настроения» (жанры с хэллоуинскими названиями).
-
-## Проверки и защита
-
-- `npm run test:smoke` — смоук-тест в настоящем браузере (`BASE=https://lovesick-radio.vercel.app npm run test:smoke`
-  — на живом сайте). Сам запускается на GitHub после каждой выкладки на Vercel (`.github/workflows/smoke.yml`).
-- `/api/health` — живы ли Audius, Deezer и YouTube Music. GitHub проверяет его раз в 6 часов
-  (`.github/workflows/health.yml`); упало — придёт письмо.
-- `src/proxy.ts` — ограничение частоты запросов с одного IP (поиск, подбор полных версий) и 404 для кривых id треков.
-- `next.config.ts` — заголовки безопасности (CSP, запрет встраивания в чужие сайты и т.п.).
-
-## Что дальше
-
-- Деплой на Vercel (+ ключ YouTube в настройках проекта, `use cache: remote` для кэша видео).
-- Аккаунты и синхронизация лайков/плейлистов между устройствами (Supabase).
+Made by **[Kyryl](https://github.com/kyrylo157)** — available for freelance projects.
